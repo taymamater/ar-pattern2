@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <title>Draw Pattern</title>
+
+  <style>
+    /* =========================
+       Modern Mobile UI System
+       ========================= */
+    :root{
+      --bg0:#07070A;
+      --bg1:#0B0B10;
+      --panel: rgba(18,18,22,0.72);
+      --panel-strong: rgba(18,18,22,0.92);
+      --stroke: rgba(255,255,255,0.12);
+      --stroke-strong: rgba(255,255,255,0.18);
+      --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.68);
+
+      --radius: 18px;
+      --radius-sm: 12px;
+
+      --gap: clamp(8px, 2.5vw, 14px);
+      --pad: clamp(12px, 3.2vw, 16px);
+
+      --control-h: 42px;
+      --icon-w: 44px;
+
+      --shadow: 0 16px 40px rgba(0,0,0,0.55);
+      --shadow-soft: 0 10px 28px rgba(0,0,0,0.45);
+
+      --maxw: 640px;
+
+      --bottom-bar-space: 118px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    button, input, select { font: inherit; }
+
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(1200px 900px at 30% 10%, #141427 0%, var(--bg0) 48%, var(--bg1) 100%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      overflow: hidden;
+      position: fixed;
+      overscroll-behavior: none;
+      touch-action: none;
+    }
+
+    body { height: 100dvh; }
+
+    /* --- STEPS --- */
+    .step {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.42s cubic-bezier(0.25, 1, 0.5, 1);
+      background: transparent;
+      overflow: hidden;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .hidden-left { transform: translateX(-100%); }
+    .hidden-right { transform: translateX(100%); }
+
+    /* --- CONTENT WRAPPER --- */
+    .bar-inner {
+      width: 100%;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      display: flex;
+      gap: var(--gap);
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--pad);
+    }
+
+    /* --- TOP BAR --- */
+    .ui-bar.top-bar {
+      position: relative;
+      z-index: 40; 
+      padding: calc(10px) 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.05));
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(10px);
+    }
+
+    .title {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-height: 34px;
+    }
+    .title h2 {
+      margin: 0;
+      font-size: clamp(15px, 4vw, 17px);
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      color: var(--text);
+    }
+    .title .subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.2px;
+    }
+
+    /* --- CONTAINERS --- */
+    #draw-container,
+    #preview-container{
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      border-radius: 0;
+      padding-bottom: calc(var(--bottom-bar-space) + env(safe-area-inset-bottom));
+    }
+
+    #draw-container {
+      background: rgba(0,0,0,0.35);
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    #preview-container {
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #backingImg {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      display: none;
+      pointer-events: none;
+      opacity: 0.9;
+      filter: contrast(1.02) saturate(1.05);
+    }
+
+    #drawCanvas,
+    #previewCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+    #drawCanvas { z-index: 10; }
+    #previewCanvas { z-index: 10; }
+
+    /* --- PATTERN DRAWER --- */
+    #patternDrawer {
+      position: absolute;
+      left: var(--pad);
+      right: var(--pad);
+      bottom: calc(var(--bottom-bar-space) + 20px + env(safe-area-inset-bottom));
+      height: 92px;
+
+      background: var(--panel-strong);
+      border: 1px solid var(--stroke);
+      border-radius: calc(var(--radius) + 4px);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(14px);
+
+      z-index: 30; 
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 12px 12px;
+
+      transform: translateY(150%);
+      transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+      touch-action: pan-x;
+      scrollbar-width: none;
+    }
+    #patternDrawer::-webkit-scrollbar { display: none; }
+    #patternDrawer.open { transform: translateY(0); }
+
+    .pattern-thumb {
+      width: 68px; height: 68px; flex-shrink: 0;
+      border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);
+      object-fit: cover; cursor: pointer; background: #000;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .pattern-thumb:active { transform: scale(0.97); }
+    .pattern-thumb:hover { border-color: rgba(255,255,255,0.28); }
+
+    /* --- BOTTOM BAR --- */
+    .ui-bar.bottom-bar {
+      position: absolute;
+      left: 0; right: 0;
+      bottom: 0;
+      z-index: 40; 
+
+      padding-top: 10px;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+
+      background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.4));
+      backdrop-filter: blur(16px);
+      border-top: 1px solid rgba(255,255,255,0.10);
+    }
+
+    /* --- CONTROLS --- */
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 60px;
+    }
+    label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--muted);
+      opacity: 0.9;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+
+      height: var(--control-h);
+      padding: 0 14px;
+
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+
+      box-shadow: 0 8px 20px rgba(0,0,0,0.28);
+      transition: transform 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:focus-visible {
+      outline: none;
+      border-color: rgba(255,255,255,0.35);
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.12), 0 10px 26px rgba(0,0,0,0.35);
+    }
+
+    .btn-icon {
+      width: var(--icon-w);
+      padding: 0;
+      font-size: 0; 
+    }
+
+    .icon{
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+
+    .tool-active {
+      background: rgba(255,255,255,0.92) !important;
+      color: rgba(0,0,0,0.88) !important;
+      border-color: rgba(255,255,255,0.92) !important;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.78);
+      box-shadow: none;
+    }
+
+    .btn-primary {
+      background: rgba(255,255,255,0.94);
+      border-color: rgba(255,255,255,0.94);
+      color: rgba(0,0,0,0.88);
+    }
+
+    select, input[type="color"] {
+      height: var(--control-h);
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      outline: none;
+      padding: 0 10px;
+    }
+    input[type="color"] {
+      width: 54px;
+      padding: 6px;
+      border-radius: 14px;
+    }
+
+    /* Sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+      height: var(--control-h);
+      margin: 0;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 5px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 999px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.95);
+      border: 2px solid rgba(0,0,0,0.25);
+      margin-top: -7.5px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.35);
+    }
+
+    .row { display: flex; gap: var(--gap); align-items: center; }
+    .row-wrap { display: flex; gap: var(--gap); align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+      width: 100%;
+    }
+
+    @media (max-width: 380px){
+      :root{ --bottom-bar-space: 126px; }
+      .pattern-thumb{ width: 62px; height: 62px; }
+      #patternDrawer{ height: 86px; }
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      .step, #patternDrawer { transition: none !important; }
+      .btn { transition: none !important; }
+    }
+
+    #imgUpload { display: none; }
+  </style>
+</head>
+
+<body>
+
+  <div id="step1" class="step">
+    <div class="ui-bar top-bar">
+      <div class="bar-inner">
+        <div class="title">
+          <h2>1. Create Tile</h2>
+          <span class="subtitle">Draw or use a base image</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="draw-container">
+      <img id="backingImg" alt="Background" crossorigin="anonymous">
+      <canvas id="drawCanvas"></canvas>
+      <div id="patternDrawer"></div>
+    </div>
+
+    <div class="ui-bar bottom-bar">
+      <div class="bar-inner row-wrap">
+        <div class="control-group">
+          <label>Color</label>
+          <input type="color" id="brushColor" value="#ffffff">
+        </div>
+
+        <div class="control-group">
+          <label>Tools</label>
+          <div class="row">
+            <button class="btn btn-icon tool-active" id="brushBtn" title="Brush" aria-label="Brush">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 20c3.5 0 5-1.2 6-3.2 1-2.1 2.3-3.2 4.5-5.4l6.1-6.1a2.5 2.5 0 0 0-3.5-3.5L11 7.9C8.8 10.1 7.7 11.4 5.6 12.4 3.2 13.5 2 15 2 18.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M6 20c0-2 1.2-3.2 3.2-4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+              </svg>
+            </button>
+
+            <button class="btn btn-icon" id="eraserBtn" title="Eraser" aria-label="Eraser">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M8 20h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M7.5 19.5 3 15c-.8-.8-.8-2 0-2.8L12.2 3c.8-.8 2-.8 2.8 0l6 6c.8.8.8 2 0 2.8L13.3 19.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M6.5 14.5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>Base</label>
+          <div class="row">
+            <button class="btn btn-icon" id="libBtn" title="Library" aria-label="Library">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M7 4h10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2V6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M7 4v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+              </svg>
+            </button>
+
+            <button class="btn btn-icon" id="uploadBtn" title="Upload" aria-label="Upload">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 15V4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M7 8l5-5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M5 20h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+              </svg>
+            </button>
+          </div>
+          <input type="file" id="imgUpload" accept="image/*">
+        </div>
+
+        <button class="btn btn-ghost" id="clearBtn" style="height:42px; padding:0 12px; font-size:13px; margin-top:16px;">Clear</button>
+
+        <div class="spacer"></div>
+
+        <button class="btn btn-primary" id="toStep2" style="height:48px; padding:0 24px; font-size:15px;">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="step2" class="step hidden-right">
+    <div class="ui-bar top-bar">
+      <div class="bar-inner">
+        <div class="title">
+          <h2>2. Style Pattern</h2>
+          <span class="subtitle">Adjust repeat + spacing</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="preview-container">
+      <canvas id="previewCanvas"></canvas>
+    </div>
+
+    <div class="ui-bar bottom-bar">
+      <div class="bar-inner">
+        <div class="stack">
+          <div class="row" style="width:100%;">
+            <div class="control-group">
+              <label>BG</label>
+              <input type="color" id="bgColor" value="#000000">
+            </div>
+
+            <div class="control-group" style="flex:1;">
+              <label>Size</label>
+              <input type="range" id="sizeSlider" min="50" max="300" value="120">
+            </div>
+
+            <div class="control-group" style="flex:1;">
+              <label>Gap</label>
+              <input type="range" id="gapSlider" min="0" max="100" value="0">
+            </div>
+          </div>
+
+          <div class="row" style="width:100%;">
+            <button class="btn btn-ghost btn-icon" id="backBtn" title="Back">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M19 12H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+
+            <div class="control-group" style="flex:1;">
+              <select id="tileMode" style="width:100%">
+                <option value="block">Full Drop / Block</option>
+                <option value="brick">Brick</option>
+                <option value="half-drop">Half Drop</option>
+                <option value="diagonal">Diagonal</option>
+                <option value="ogee">Ogee</option>
+                <option value="tossed">Tossed / Random</option>
+              </select>
+            </div>
+
+            <button class="btn btn-primary" id="saveBtn" style="flex:1;">View in AR →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- VARIABLES ---
+    const drawCanvas = document.getElementById("drawCanvas");
+    const ctx = drawCanvas.getContext("2d");
+    const backingImg = document.getElementById("backingImg");
+    const previewCanvas = document.getElementById("previewCanvas");
+    const pctx = previewCanvas.getContext("2d");
+
+    // Tools
+    let isDrawing = false;
+    let lastX = 0; let lastY = 0;
+    let currentMode = 'brush';
+    const brushBtn = document.getElementById("brushBtn");
+    const eraserBtn = document.getElementById("eraserBtn");
+
+    // ============================================================
+    //  👇 YOUR IMAGE LIST 👇
+    // ============================================================
+    const presetPatterns = [
+      "patterns/p1.png",
+      "patterns/p2.png",
+      "patterns/p3.png",
+      "patterns/p4.png",
+      "patterns/p5.png",
+      "patterns/p6.png",
+      "patterns/p7.png",
+      "patterns/p8.png",
+      "patterns/p9.png",
+      "patterns/p10.png",
+      "patterns/p11.png"
+    ];
+    // ============================================================
+
+    // --- INIT PATTERN DRAWER ---
+    const patternDrawer = document.getElementById("patternDrawer");
+    const libBtn = document.getElementById("libBtn");
+
+    presetPatterns.forEach(src => {
+      const img = document.createElement("img");
+      img.src = src;
+      img.className = "pattern-thumb";
+      img.onerror = () => { img.style.display = 'none'; };
+      img.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setBackingImage(src);
+        patternDrawer.classList.remove("open");
+      });
+      patternDrawer.appendChild(img);
+    });
+
+    libBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      patternDrawer.classList.toggle("open");
+    });
+
+    // --- 1. SETUP CANVAS ---
+    function resizeDrawCanvas() {
+      const container = document.getElementById("draw-container");
+      if (drawCanvas.width !== container.clientWidth || drawCanvas.height !== container.clientHeight) {
+        const saved = drawCanvas.toDataURL();
+        drawCanvas.width = container.clientWidth;
+        drawCanvas.height = container.clientHeight;
+
+        ctx.lineWidth = 12;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        updateToolSettings();
+
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0);
+        img.src = saved;
+      }
+    }
+    window.addEventListener("resize", resizeDrawCanvas);
+    setTimeout(resizeDrawCanvas, 10);
+
+    // --- 2. TOOLS ---
+    function updateToolSettings() {
+      if (currentMode === 'brush') {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = document.getElementById("brushColor").value;
+        brushBtn.classList.add("tool-active");
+        eraserBtn.classList.remove("tool-active");
+      } else {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+        brushBtn.classList.remove("tool-active");
+        eraserBtn.classList.add("tool-active");
+      }
+    }
+    brushBtn.addEventListener("click", () => { currentMode = 'brush'; updateToolSettings(); });
+    eraserBtn.addEventListener("click", () => { currentMode = 'eraser'; updateToolSettings(); });
+    document.getElementById("brushColor").addEventListener("input", () => {
+      if (currentMode === 'eraser') currentMode = 'brush';
+      updateToolSettings();
+    });
+
+    // --- 3. DRAWING LOGIC ---
+    function startDraw(e) {
+      patternDrawer.classList.remove("open");
+      if(e.cancelable) e.preventDefault();
+      isDrawing = true;
+      const { x, y } = getPos(e);
+      lastX = x; lastY = y;
+    }
+    function draw(e) {
+      if(e.cancelable) e.preventDefault();
+      if (!isDrawing) return;
+      const { x, y } = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      lastX = x; lastY = y;
+    }
+    function endDraw() { isDrawing = false; }
+
+    function getPos(e) {
+      const rect = drawCanvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    drawCanvas.addEventListener("mousedown", startDraw);
+    drawCanvas.addEventListener("mousemove", draw);
+    drawCanvas.addEventListener("mouseup", endDraw);
+    drawCanvas.addEventListener("touchstart", startDraw, { passive: false });
+    drawCanvas.addEventListener("touchmove", draw, { passive: false });
+    drawCanvas.addEventListener("touchend", endDraw);
+
+    // --- CLEAR FUNCTIONALITY ---
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      backingImg.src = "";
+      backingImg.style.display = "none";
+    });
+
+    // --- 4. IMAGE HANDLING ---
+    function setBackingImage(src) {
+      backingImg.crossOrigin = "Anonymous";
+      backingImg.src = src;
+      backingImg.style.display = "block";
+    }
+
+    const uploadBtn = document.getElementById("uploadBtn");
+    const fileInput = document.getElementById("imgUpload");
+    uploadBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => setBackingImage(event.target.result);
+      reader.readAsDataURL(file);
+    });
+
+    // --- 5. COMPOSITE TILE ---
+    function getCompositeCanvas() {
+      const c = document.createElement("canvas");
+      c.width = drawCanvas.width;
+      c.height = drawCanvas.height;
+      const cx = c.getContext("2d");
+
+      if (backingImg.style.display !== 'none' && backingImg.src) {
+        const img = backingImg;
+        const nw = img.naturalWidth || 100;
+        const nh = img.naturalHeight || 100;
+        const canvasRatio = c.width / c.height;
+        const imgRatio = nw / nh;
+
+        let dw, dh, dx, dy;
+        if (imgRatio > canvasRatio) {
+          dh = c.height; dw = c.height * imgRatio;
+          dx = (c.width - dw) / 2; dy = 0;
+        } else {
+          dw = c.width; dh = c.width / imgRatio;
+          dx = 0; dy = (c.height - dh) / 2;
+        }
+        try { cx.drawImage(img, dx, dy, dw, dh); } catch(e) {}
+      }
+      cx.drawImage(drawCanvas, 0, 0);
+      return c;
+    }
+
+    // --- NAVIGATION ---
+    const step1 = document.getElementById("step1");
+    const step2 = document.getElementById("step2");
+    document.getElementById("toStep2").addEventListener("click", () => {
+      renderPattern(previewCanvas, null);
+      step1.classList.add("hidden-left");
+      step2.classList.remove("hidden-right");
+    });
+    document.getElementById("backBtn").addEventListener("click", () => {
+      step2.classList.add("hidden-right");
+      step1.classList.remove("hidden-left");
+    });
+
+    // --- 6. UNIFIED RENDER LOGIC (Preview + Save) ---
+    const bgColorInput = document.getElementById("bgColor");
+    const tileModeInput = document.getElementById("tileMode");
+    const sizeSlider = document.getElementById("sizeSlider");
+    const gapSlider = document.getElementById("gapSlider");
+
+    [bgColorInput, tileModeInput, sizeSlider, gapSlider].forEach(el => {
+      el.addEventListener("input", () => renderPattern(previewCanvas, null));
+    });
+
+    // Seeded Random for Tossed Mode
+    function pseudoRandom(x, y) {
+      return ((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1 + 1) % 1;
+    }
+
+    function renderPattern(targetCanvas, exportConfig) {
+      const source = getCompositeCanvas();
+      const ctx = targetCanvas.getContext("2d");
+
+      if (exportConfig) {
+        targetCanvas.width = exportConfig.width;
+        targetCanvas.height = exportConfig.height;
+      } else {
+        const container = document.getElementById("preview-container");
+        targetCanvas.width = container.clientWidth;
+        targetCanvas.height = container.clientHeight;
+      }
+
+      ctx.fillStyle = bgColorInput.value;
+      ctx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+
+      // Params
+      const mode = tileModeInput.value;
+      const baseSize = parseInt(sizeSlider.value);
+      const gap = parseInt(gapSlider.value);
+      const srcRatio = source.width / source.height;
+
+      // Scale Logic
+      let tileW, tileH, strideX, strideY;
+      
+      if (exportConfig) {
+        const refScreenW = 360;
+        const visualStride = baseSize + gap;
+        const scaleRatio = (exportConfig.width / (refScreenW / visualStride)) / visualStride;
+        tileW = baseSize * scaleRatio;
+        tileH = (baseSize / srcRatio) * scaleRatio;
+        strideX = tileW + (gap * scaleRatio);
+        strideY = tileH + (gap * scaleRatio);
+      } else {
+        tileW = baseSize;
+        tileH = baseSize / srcRatio;
+        strideX = tileW + gap;
+        strideY = tileH + gap;
+      }
+
+      // Determine loop bounds
+      let minX = -1;
+      let minY = -1;
+      let maxX = Math.ceil(targetCanvas.width / strideX) + 1;
+      let maxY = Math.ceil(targetCanvas.height / strideY) + 1;
+
+      // For Diagonal, expand the drawing area to the left
+      // because positive Y shifts the row to the right.
+      if (mode === 'diagonal') {
+          minX = -Math.ceil(maxY * 0.5) - 2; 
+      }
+
+      for (let y = minY; y < maxY; y++) {
+        for (let x = minX; x < maxX; x++) {
+          ctx.save();
+          let dx = x * strideX;
+          let dy = y * strideY;
+          let rotation = 0;
+
+          // --- LAYOUT LOGIC ---
+          if (mode === 'brick') {
+            if (y % 2 !== 0) dx -= strideX / 2;
+          } 
+          else if (mode === 'half-drop' || mode === 'ogee') {
+            if (x % 2 !== 0) dy -= strideY / 2;
+          }
+          else if (mode === 'diagonal') {
+            dx += y * (strideX / 2);
+            rotation = Math.PI / 4; // Rotate 45 degrees
+          }
+          else if (mode === 'tossed') {
+             const seed = pseudoRandom(x, y);
+             rotation = (seed * 360) * (Math.PI/180);
+             dx += (seed - 0.5) * (strideX * 0.5);
+             dy += (pseudoRandom(y, x) - 0.5) * (strideY * 0.5);
+          }
+          // Block is default (no offsets)
+
+          // Draw
+          ctx.translate(dx + tileW/2, dy + tileH/2);
+          ctx.rotate(rotation);
+          ctx.drawImage(source, -tileW/2, -tileH/2, tileW, tileH);
+          ctx.restore();
+        }
+      }
+    }
+
+    // --- 7. SAVE ---
+    document.getElementById("saveBtn").addEventListener("click", () => {
+      const exportCanvas = document.createElement("canvas");
+      // Use 1024x1024 for high quality AR texture
+      renderPattern(exportCanvas, { width: 1024, height: 1449 });
+      
+      localStorage.setItem("pattern_png", exportCanvas.toDataURL("image/png"));
+      location.href = "ar.html";
+    });
+  </script>
+</body>
+</html>
